@@ -34,6 +34,7 @@
 #include "main/install.h"
 #include "main/shots.h"
 #include "main/updates.h"
+#include "main/local_time.h"
 
 #include <algorithm>
 #include <cmath>
@@ -51,9 +52,15 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <shellapi.h>
+#elif defined(__APPLE__)
+#include <crt_externs.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#endif
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Elements/ElementFormControl.h>
@@ -779,8 +786,12 @@ namespace {
         static const int resize_refresh = oot::ui::row_index("resizerefresh");
         static const int scale_reload = oot::ui::row_index("scalereload");
         static const int smooth_scroll = oot::ui::row_index("smoothscroll");
+#if defined(__APPLE__)
+        return (row >= 0) && (row == resize_refresh || row == scale_reload || row == smooth_scroll);
+#else
         return (row >= 0) && (row == recorder || row == length || row == comparison || row == resize_refresh ||
                               row == scale_reload || row == smooth_scroll);
+#endif
     }
 
     // COMPARISON SHOTS SHOWS ONLY WHILE SCREENSHOTS IS ON (the user, 2026-10-09: "this being enabled
@@ -1058,7 +1069,11 @@ namespace {
             return rows;
         }
         // Settings itself: the program, not the game.
-        for (const char* key : { "updates", "autosave", "saveonquit", "resumeonstart", "menu", "interfacesize", "volume",
+        for (const char* key : {
+#if !defined(__APPLE__)
+                                 "updates",
+#endif
+                                 "autosave", "saveonquit", "resumeonstart", "menu", "interfacesize", "volume",
                                  "menusounds" }) {
             add(key);
         }
@@ -2107,7 +2122,9 @@ namespace {
         rows.push_back({ "Texture packs", oot::places::texture_packs(), oot::places::texture_packs() });
         rows.push_back({ "Settings", settings, settings.parent_path() });
         rows.push_back({ "Controls", controls, controls.parent_path() });
+#if !defined(__APPLE__)
         rows.push_back({ "Recordings", oot::places::captures(), oot::places::captures() });
+#endif
 
         // The ROM is the user's own file in the user's own place, and saying exactly where it is
         // matters more here than anywhere else on this screen: this program reads it where it
@@ -2118,6 +2135,9 @@ namespace {
                          rom.empty() ? std::filesystem::path() : rom.parent_path() });
 
         if (oot::places::mode() == oot::places::Mode::Installed) {
+#if defined(__APPLE__)
+            // The local Mac build has no installer or shortcuts.
+#else
             const oot::install::Options chosen = oot::install::options();
             if (chosen.start_menu) {
                 const std::filesystem::path link = oot::install::shortcut_path();
@@ -2127,6 +2147,7 @@ namespace {
                 const std::filesystem::path link = oot::install::desktop_shortcut_path();
                 rows.push_back({ "Desktop shortcut", link, link.parent_path() });
             }
+#endif
         }
         return rows;
     }
@@ -2169,7 +2190,11 @@ namespace {
 
         std::string mode = oot::places::mode_word();
         if (oot::places::mode() == oot::places::Mode::Installed) {
+#if defined(__APPLE__)
+            mode = "local macOS build";
+#else
             mode += ", version " + oot::places::installed_version();
+#endif
         }
         else {
             mode += ", nothing was installed on this machine";
@@ -2200,11 +2225,15 @@ namespace {
         // Uninstalling removes the program and nothing of the person's (install.h, remove_program).
         set_text(g_files_doc, "files-left-label", g_remove_armed ? "No, keep it" : "Close");
         if (oot::places::mode() == oot::places::Mode::Installed) {
+#if defined(__APPLE__)
+            set_text(g_files_doc, "files-foot", "Click a row, or its Open, to open that folder");
+#else
             set_text(g_files_doc, "files-right-label", g_remove_armed ? "Yes, uninstall" : "Uninstall");
             set_text(g_files_doc, "files-foot",
                      g_remove_armed
                          ? "Uninstall the program? Its Program files folder above is deleted. Your saves and moments, your ROM, texture packs, mods, settings and controls all stay where they are"
                          : "Click a row, or its Open, to open that folder");
+#endif
         }
         else {
             // Portable installed nothing, so there is nothing here to remove. Saying so is more
@@ -2214,7 +2243,11 @@ namespace {
                      "Click a row, or its Open, to open that folder. This copy runs portable, so it installed nothing");
         }
         if (Rml::Element* e = g_files_doc->GetElementById("files-right")) {
+#if defined(__APPLE__)
+            e->SetProperty("display", "none");
+#else
             e->SetClass("armed", g_remove_armed);
+#endif
         }
         apply_files_focus();
     }
@@ -2231,7 +2264,17 @@ namespace {
         if (!std::filesystem::exists(folder, ec)) {
             return;
         }
+#if defined(_WIN32)
         ShellExecuteW(nullptr, L"open", folder.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+        const std::string path = folder.string();
+        char* const argv[] = { const_cast<char*>("open"), const_cast<char*>(path.c_str()), nullptr };
+        pid_t child = 0;
+        if (posix_spawn(&child, "/usr/bin/open", nullptr, nullptr, argv, *_NSGetEnviron()) == 0) {
+            int status = 0;
+            (void)waitpid(child, &status, 0);
+        }
+#endif
     }
 
     void click_files(const std::string& id) {
@@ -2248,6 +2291,9 @@ namespace {
             return;
         }
         if (id == "files-right") {
+#if defined(__APPLE__)
+            return;
+#endif
             if (oot::places::mode() != oot::places::Mode::Installed) {
                 return;
             }
@@ -2307,7 +2353,11 @@ namespace {
             case Nav::Right:
                 // Sideways only within the pair: a row has nothing beside it.
                 if (on_buttons) {
+#if defined(__APPLE__)
+                    g_ffocus = left;
+#else
                     g_ffocus = nav == Nav::Left ? left : right;
+#endif
                     apply_files_focus();
                 }
                 break;
@@ -2485,6 +2535,9 @@ namespace {
     // The ROM question only makes sense once there IS a ROM to copy and somewhere of our own to
     // put it, so it waits for both rather than being asked into the void on a fresh install.
     bool rom_copy_worth_asking() {
+#if defined(__APPLE__)
+        return false;
+#else
         if (oot::ui::rom_choice_made() || oot::places::mode() != oot::places::Mode::Installed) {
             return false;
         }
@@ -2497,15 +2550,18 @@ namespace {
         std::error_code ec;
         return !rom.parent_path().empty() &&
                !std::filesystem::equivalent(rom.parent_path(), oot::places::roms(), ec);
+#endif
     }
 
     // Which question is due, if any. Returns false when there is nothing left to ask, which is
     // the normal state after the first run.
     bool ask_next_question() {
+#if !defined(__APPLE__)
         if (!oot::ui::update_choice_made()) {
             g_question = Question::Updates;
             return true;
         }
+#endif
         if (rom_copy_worth_asking()) {
             g_question = Question::RomCopy;
             return true;
@@ -3482,11 +3538,17 @@ namespace {
         if (g_frame_doc == nullptr || !g_frame_shown) {
             return;
         }
+#if !defined(__APPLE__)
         const bool fullscreen = g_fullscreen.load(std::memory_order_relaxed);
+#endif
         const bool header = g_pointer_in_band ||
                             seconds_since(g_band_left_at) < HEADER_LINGER_SECONDS ||
                             seconds_since(g_frame_since) < HEADER_INTRO_SECONDS;
+#if defined(__APPLE__)
+        const bool edge = false;
+#else
         const bool edge = !fullscreen;
+#endif
         if (header != g_header_shown) {
             g_header_shown = header;
             if (Rml::Element* e = g_frame_doc->GetElementById("frame-bar")) {
@@ -3978,7 +4040,7 @@ namespace {
                 // another saved where it was) is a new picture to the interface's cache, which
                 // otherwise keeps the first one it loaded under a name, or a failed load, for good.
                 const auto stamp = std::filesystem::last_write_time(thumb, ec).time_since_epoch().count();
-                src += "?v=" + std::to_string(stamp) + "-" + std::to_string(std::filesystem::file_size(thumb, ec));
+                src += "?v=" + std::to_string(static_cast<long long>(stamp)) + "-" + std::to_string(std::filesystem::file_size(thumb, ec));
                 rml += "<img class=\"thumb\" src=\"" + escape(src) + "\"/>";
             }
             else {
@@ -4011,7 +4073,7 @@ namespace {
                 char when[32] = {};
                 const std::time_t t = static_cast<std::time_t>(header.captured_at);
                 std::tm tm{};
-                localtime_s(&tm, &t);
+                oot::local_time(t, tm);
                 std::strftime(when, sizeof(when), "%Y-%m-%d %H:%M", &tm);
                 // The region the place sits in, beside the date; the scene's number where the
                 // catalog has no place for it.

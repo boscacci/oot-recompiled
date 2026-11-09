@@ -1,5 +1,9 @@
 # OoT: Recompiled
 
+- An experimental Apple Silicon / Metal port has been based on [JonB-Dev/oot-recompiled](https://github.com/JonB-Dev/oot-recompiled), commit `e5c6edd` (0.6.1), with AI assistance.
+- Reproduction steps, measurements, and limitations are recorded in [the macOS experiment notes](docs/macos-port.md).
+- The original Windows project and documentation below are credited to Jonathan Barnes. No macOS release or upstream support commitment is implied.
+
 A static recompilation of a Nintendo 64 game's NTSC-U 1.0 release into a native Windows
 executable.
 

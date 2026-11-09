@@ -16,8 +16,10 @@
 #include <string>
 #include <filesystem>
 
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#endif
 
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -70,6 +72,7 @@ RspExitReason njpgdspMain(uint8_t* rdram, uint32_t ucode_addr);
 namespace {
 
     SDL_Window* g_window = nullptr;
+    ultramodern::renderer::WindowHandle g_native_window{};
     SDL_AudioDeviceID g_audio_device = 0;
     std::atomic<uint32_t> g_sample_rate{ 32000 };
     // The window's client size, kept by the thread that pumps its messages so the game thread
@@ -421,6 +424,9 @@ namespace {
     }
 
     ultramodern::renderer::WindowHandle create_window(void*) {
+#if defined(__APPLE__)
+        return g_native_window;
+#else
         SDL_SysWMinfo wmInfo{};
         SDL_VERSION(&wmInfo.version);
         SDL_GetWindowWMInfo(g_window, &wmInfo);
@@ -429,6 +435,7 @@ namespace {
         handle.window = wmInfo.info.win.window;
         handle.thread_id = GetCurrentThreadId();
         return handle;
+#endif
     }
 
     // Keys the interface owns. F1, F2 and F3 open its screens; everything else here only does
@@ -939,6 +946,7 @@ void oot::boot::run(SDL_Window* window,
                     int argc,
                     char** argv) {
     g_window = window;
+    g_native_window = window_handle;
     {
         int width = 0;
         int height = 0;
@@ -1055,7 +1063,11 @@ void oot::boot::run(SDL_Window* window,
                         const int32_t entrance =
                             static_cast<int32_t>(std::strtol(one.c_str(), nullptr, 0));
                         if (first) {
+#if defined(__APPLE__)
+                            oot::game_state::set_startup_warp(entrance);
+#else
                             oot::game_state::set_pending_warp(entrance);
+#endif
                             first = false;
                         }
                         else {
@@ -1257,6 +1269,11 @@ void oot::boot::run(SDL_Window* window,
         else if (arg == "--play") {
             g_play_now = true;
         }
+#if defined(__APPLE__)
+        else if (arg == "--data-root") {
+            ++i; // main selected the profile before boot read settings and SRAM.
+        }
+#endif
         // Windows runs this when somebody picks Uninstall in its installed apps list, and the
         // launcher's own Your files row reaches the same surface. It is NOT a silent removal:
         // the program comes up on that surface with the real paths listed and a button that has
