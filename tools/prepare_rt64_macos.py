@@ -26,6 +26,11 @@ def tree_digest(root: Path) -> str:
 
 
 def prepare(source: Path, destination: Path, series: Path, pin: str = RT64_PIN) -> int:
+    source, destination, series = source.resolve(), destination.resolve(), series.resolve()
+    if (source == destination or source in destination.parents or
+            destination in source.parents or destination == series or
+            destination in series.parents):
+        raise RuntimeError("RT64_PATH_OVERLAP: keep source, patches, and build copy separate")
     if not (source / "CMakeLists.txt").is_file():
         raise RuntimeError(f"RT64 submodule is missing: {source}")
     actual = subprocess.check_output(
@@ -40,6 +45,8 @@ def prepare(source: Path, destination: Path, series: Path, pin: str = RT64_PIN) 
         raise RuntimeError("RT64_SOURCE_DIRTY: inspect the pinned submodule before copying it")
 
     patches = sorted(series.glob("*.patch")) + sorted((series / "macos").glob("*.patch"))
+    if not patches:
+        raise RuntimeError("RT64_SERIES_EMPTY: no renderer patches were found")
     series_hash = hashlib.sha256(pin.encode())
     for patch in patches:
         series_hash.update(patch.relative_to(series).as_posix().encode())
@@ -52,11 +59,11 @@ def prepare(source: Path, destination: Path, series: Path, pin: str = RT64_PIN) 
             return len(patches)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix="rt64-src-", dir=destination.parent))
     backup = destination.with_name(destination.name + ".previous")
     if backup.exists():
         raise RuntimeError(f"Previous RT64 backup needs inspection: {backup}")
 
+    temporary = Path(tempfile.mkdtemp(prefix="rt64-src-", dir=destination.parent))
     try:
         shutil.rmtree(temporary)
         shutil.copytree(source, temporary, ignore=shutil.ignore_patterns(".git"))

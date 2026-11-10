@@ -86,6 +86,28 @@ class PrepareRt64Tests(unittest.TestCase):
             prepare(self.source, self.destination, self.series, self.pin)
         self.assertEqual((self.destination / "keep").read_text(), "keep")
 
+    def test_empty_series_preserves_existing_build(self):
+        self.destination.mkdir(parents=True)
+        (self.destination / "keep").write_text("keep")
+        with self.assertRaisesRegex(RuntimeError, "RT64_SERIES_EMPTY"):
+            prepare(self.source, self.destination, self.series, self.pin)
+        self.assertEqual((self.destination / "keep").read_text(), "keep")
+
+    def test_existing_backup_leaves_no_temporary_copy(self):
+        self.write_patch("base\npatched\n")
+        self.destination.parent.mkdir(parents=True)
+        backup = self.destination.with_name(self.destination.name + ".previous")
+        backup.mkdir()
+        with self.assertRaisesRegex(RuntimeError, "backup needs inspection"):
+            prepare(self.source, self.destination, self.series, self.pin)
+        self.assertEqual(list(self.destination.parent.iterdir()), [backup])
+
+    def test_destination_cannot_replace_source(self):
+        self.write_patch("base\npatched\n")
+        with self.assertRaisesRegex(RuntimeError, "RT64_PATH_OVERLAP"):
+            prepare(self.source, self.source, self.series, self.pin)
+        self.assertTrue((self.source / ".git").is_dir())
+
 
 if __name__ == "__main__":
     unittest.main()

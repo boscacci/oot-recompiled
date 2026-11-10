@@ -7,7 +7,7 @@ import re
 import subprocess
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -110,6 +110,7 @@ def monitor_game(process: subprocess.Popen, seconds: int, max_rss_mib: int,
     """Bound a session by time, RSS, and driver health; return peak RSS in KiB."""
     peak = 0
     deadline = time.monotonic() + seconds
+    gpu_since = started
     next_gpu_check = time.monotonic() + 3
     while time.monotonic() < deadline:
         status = process.poll()
@@ -118,8 +119,11 @@ def monitor_game(process: subprocess.Popen, seconds: int, max_rss_mib: int,
                 break
             raise RuntimeError(f"app exited {status}")
         if time.monotonic() >= next_gpu_check:
-            if metal_gpu_errors(process.pid, started):
+            checked_at = datetime.now()
+            if metal_gpu_errors(process.pid, gpu_since):
                 raise RuntimeError("macOS logged Metal GPU errors")
+            # Overlap windows to cover timestamp rounding and delayed log delivery.
+            gpu_since = checked_at - timedelta(seconds=10)
             next_gpu_check = time.monotonic() + 3
         result = subprocess.run(["ps", "-o", "rss=", "-p", str(process.pid)],
                                 capture_output=True, text=True, check=False)
@@ -131,6 +135,9 @@ def monitor_game(process: subprocess.Popen, seconds: int, max_rss_mib: int,
         if peak > max_rss_mib * 1024:
             raise RuntimeError(f"RSS exceeded {max_rss_mib} MiB")
         time.sleep(0.25)
+    status = process.poll()
+    if status is not None and not (interactive and status == 0):
+        raise RuntimeError(f"app exited {status}")
     return peak
 
 
