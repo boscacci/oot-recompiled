@@ -1446,7 +1446,7 @@ namespace {
                 case RowKind::MacPreset: {
                     const char* labels[] = { "Native detail", "Native balanced", "1080p headroom" };
                     const char* notes[] = {
-                        "Native resolution, 4x AA, 4 AO rays. Try on a faster GPU or a 1440p display.",
+                        "Native resolution, 8x AA, 4 AO rays. Try on a faster GPU or a 1440p display.",
                         "Native resolution, 2x AA, 2 AO rays. More headroom for larger displays.",
                         "1080p, 2x AA, 2 AO rays. Use if native resolution cannot hold 20 fps." };
                     row.label = labels[specs[i].setting];

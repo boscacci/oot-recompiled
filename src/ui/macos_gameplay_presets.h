@@ -10,7 +10,7 @@ inline bool gameplay_preset(int preset, Settings& s, lighting::Lighting& l) {
     s.resolution = preset == 2 ? 4 : 2;
     s.downsampling = 0;
     s.aspect = 1;
-    s.antialiasing = preset == 0 ? 2 : 1;
+    s.antialiasing = preset == 0 ? 3 : 1;
     s.frame_rate = 0;
     s.texture_detail = 2;
     s.render_distance = 0;

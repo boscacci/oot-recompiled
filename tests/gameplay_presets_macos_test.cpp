@@ -15,7 +15,7 @@ int main() {
         assert(s.resolution == (preset == 2 ? 4 : 2));
         assert(lighting::values_of(l).level == 2);
         assert(lighting::values_of(l).occlusion_samples == (preset == 0 ? 4 : 2));
-        assert(s.antialiasing == (preset == 0 ? 2 : 1));
+        assert(s.antialiasing == (preset == 0 ? 3 : 1));
         const auto original_s = s; const auto original_l = l;
         assert(macos::gameplay_preset(preset, s, l));
         assert(s.volume_percent == original_s.volume_percent && l == original_l);

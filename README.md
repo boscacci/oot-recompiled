@@ -26,13 +26,29 @@
 
 ## Visual settings on this M5
 
-- **In-app presets:** Native detail selects native resolution, 4× AA, four AO rays; Native balanced selects native resolution, 2× AA, two AO rays; 1080p headroom selects 1080p, 2× AA, two AO rays. All target the original 20 fps, preserve the selected pack at Full detail, disable downsampling, use original draw distance, and enable shadows/local lights/AO. Level-3 effects are disabled. Changes are saved only when a preset is selected; individual settings remain adjustable. The detected GPU and current output size are displayed alongside the choices. No universal hardware-to-performance guarantee is implied.
+- **In-app presets:** Native detail selects native resolution, 8× AA, four AO rays; Native balanced selects native resolution, 2× AA, two AO rays; 1080p headroom selects 1080p, 2× AA, two AO rays. All target the original 20 fps, preserve the selected pack at Full detail, disable downsampling, use original draw distance, and enable shadows/local lights/AO. Level-3 effects are disabled. Changes are saved only when a preset is selected; individual settings remain adjustable. The detected GPU and current output size are displayed alongside the choices. No universal hardware-to-performance guarantee is implied.
 
-- **Steadier-play starting point:** Fullscreen, Resolution **1440p**, aspect **Expand to the window**, Frame rate **Original (20 fps)**, Texture detail **Full**, antialiasing **4×**, four occlusion rays, and the level-2 tracing launch above. Shadows, local lighting, and AO are retained; downsampling is disabled. About 20 presents/s were measured in the heavier child-field trial at these settings.
+- **Earlier internal-display starting point:** Fullscreen, Resolution **1440p**, aspect **Expand to the window**, Frame rate **Original (20 fps)**, Texture detail **Full**, antialiasing **4×**, four occlusion rays, and the level-2 tracing launch above. Shadows, local lighting, and AO are retained; downsampling is disabled. About 20 presents/s were measured in the heavier child-field trial at these settings.
 - **Earlier internal-display measurements:** A sharper internal picture is provided by Resolution **Match the window**, **2×** antialiasing, and **two** AO rays, with roughly 15–20 presents/s across the tested views. Antialiasing can be set to **Off** for additional headroom. A locked 20 fps across the whole game has not been established, and the 60 fps path remains problematic.
 - **Session limits:** A 300-second guarded run covered Hyrule Field → Kakariko Village → Temple of Time → Hyrule Field without a detected driver fault; startup and transitions are included in that duration. Native 2×-AA samples were around 16 presents/s in Kakariko and 19–20 in the adult field and temple. Broad game progression, hours-long sessions, and level-3 lighting have not been validated. Isolated test profiles were used; normal saves were preserved.
 
-## Benchmarks on this Mac
+## Native gameplay on the connected 1440p monitor
+
+- **M27Q, native 2560×1440 at 60 Hz · M5 · AC power · Low Power Mode off.** Full textures and level-2 tracing were retained. These are separate from the higher-resolution internal-display measurements below.
+- **Recommended here: Graphics → Native detail**, now 8× AA and four AO rays. The highest AA option was retained; eight AO rays exceeded the frame budget in Kakariko. The starting 2×-AA/two-AO-ray field profile already held 20 fps; visual quality was raised while retaining that target. No renderer speedup is claimed.
+
+| Scene / setting | AA / AO rays | Mean presents/s | Mean interval | Worst interval | Run |
+|---|---:|---:|---:|---:|---:|
+| Hyrule Field / starting profile | 2× / 2 | 20.00 | 50.01 ms | 56.87 ms | 120 s |
+| Kakariko / too heavy | 8× / 8 | 16.67 | 60.01 ms | 62.13 ms | 120 s |
+| Hyrule Field / quality trial | 4× / 4 | 19.96 | 50.03 ms | 56.84 ms | 120 s |
+| Kakariko / longer trial | 4× / 4 | 20.00 | 49.99 ms | 55.84 ms | 300 s |
+| Kakariko / selected quality | 8× / 4 | 20.00 | 50.01 ms | 54.77 ms | 180 s |
+
+- The table uses the same warm comparison window, samples 69–92. Across the longer 8×-AA/four-AO window (samples 69–178), 20.00 presents/s were averaged, with 20–20 per sample and a 54.84 ms worst interval. The five-minute 4×-AA/four-AO run averaged 20.00 over samples 69–298, with a 59.11 ms worst interval. Startup is excluded from these windows but included in run durations.
+- The final-build quality comparisons were run at `0c48b7f`; the initial profile was run at `16d8aeb`. Settings were subsequently exposed through the Native detail preset. These are stationary scene probes; broad progression, other displays/Macs, thermal equilibrium, and hours-long play are unqualified. Frame-percentile claims are not inferred from one-second means. [Method and reproduction](docs/benchmarks/2026-11-09-m5-native.md), [commit/binary identity and results](docs/benchmarks/2026-11-09-m5-native.json), and [per-second samples](docs/benchmarks/2026-11-09-m5-native.csv) are provided.
+
+## Earlier internal-display benchmarks
 
 - **2026-11-09 · Apple M5, 10 GPU cores · 32 GiB · macOS 26.7.1 · code [`f4917e9`](https://github.com/boscacci/oot-recompiled/commit/f4917e965badd60c3573b6a8cd2b3f4083058e68).** Output was 3024×1898; internal render sizes are listed below. Full-detail textures, level-2 tracing, and the original NTSC 20 fps target were selected in every row.
 - The same save and scripted input were used within each scene comparison. Samples cover seconds 69–92. All seven individual runs and the separate scene tour passed the driver-fault and process-memory watchdogs; run durations include startup and file selection.
