@@ -14,6 +14,9 @@
 #include "ui/ui_render.h"
 #include "ui/ui_settings.h"
 #include "ui/ui_lighting.h"
+#if defined(OOT_MACOS_TRACING_APP)
+#include "ui/macos_gameplay_presets.h"
+#endif
 #include "ui/ui_system.h"
 #include "ui/models/rows_model.h"
 #include "ui/models/shell_model.h"
@@ -756,8 +759,17 @@ namespace {
     // in the settings that opens it, LightingReset the sub menu's last row (2026-09-24).
     // LightingSweep is the sub menu's harness row: every option of every row captured in turn
     // (main/sweep.h, the user's ask of 2026-09-24).
+#if defined(OOT_MACOS_TRACING_APP)
+    int g_macos_preset_applied = -1;
+    std::string g_macos_preset_status;
+#endif
+
     enum class RowKind { Setting, Rom, Controls, Files, Moments, Debug, Play, Quit, Lighting, LightingMenu, LightingReset, LightingSweep, Warps, TimeOfDay, Piece, HudMenu,
-                         CapturePhoto, CaptureVideo };
+                         CapturePhoto, CaptureVideo
+#if defined(OOT_MACOS_TRACING_APP)
+                         , MacPreset
+#endif
+                         };
 
     struct RowSpec {
         RowKind kind = RowKind::Setting;
@@ -1014,6 +1026,11 @@ namespace {
             }
         };
         if (screen == Screen::Graphics) {
+#if defined(OOT_MACOS_TRACING_APP)
+            for (int preset = 0; preset < 3; ++preset) {
+                rows.push_back(RowSpec{ RowKind::MacPreset, preset });
+            }
+#endif
             for (const char* key : { "window", "resolution", "downsampling", "aspect", "antialiasing", "renderdistance",
                                      "framerate", "counter", "texturepack" }) {
                 add(key);
@@ -1425,6 +1442,30 @@ namespace {
                                  [setting](int i) { return oot::ui::lighting::option_label(setting, i); });
                     break;
                 }
+#if defined(OOT_MACOS_TRACING_APP)
+                case RowKind::MacPreset: {
+                    const char* labels[] = { "Native detail", "Native balanced", "1080p headroom" };
+                    const char* notes[] = {
+                        "Native resolution, 4x AA, 4 AO rays. Try on a faster GPU or a 1440p display.",
+                        "Native resolution, 2x AA, 2 AO rays. More headroom for larger displays.",
+                        "1080p, 2x AA, 2 AO rays. Use if native resolution cannot hold 20 fps." };
+                    row.label = labels[specs[i].setting];
+                    row.value = "Apply 20 fps / Full textures / level-2 lighting";
+                    row.note = notes[specs[i].setting];
+                    row.note += " Selected pack, original draw distance; level-3 effects off. Settings remain adjustable.";
+                    if (specs[i].setting == 0) {
+                        int width = 0, height = 0;
+                        oot::ui::render::last_size(width, height);
+                        row.note += " Detected: " + oot::ui::render::device_name() + ", " +
+                                    std::to_string(width) + " x " + std::to_string(height) + " output.";
+                    }
+                    if (g_game_started && !oot::rt_state::supported())
+                        row.note += " Tracing is unavailable; this session uses raster rendering.";
+                    if (g_macos_preset_applied == specs[i].setting) row.note += g_macos_preset_status;
+                    row.shape = oot::ui::rows::Action;
+                    break;
+                }
+#endif
                 case RowKind::LightingMenu:
                     row.label = "Lighting";
                     row.value = "Switch each part of it on or off, and tune it";
@@ -1932,6 +1973,23 @@ namespace {
                     case RowKind::CaptureVideo:
                         show(Screen::Video);
                         break;
+#if defined(OOT_MACOS_TRACING_APP)
+                    case RowKind::MacPreset: {
+                        auto s = oot::ui::settings();
+                        auto l = oot::ui::lighting::current();
+                        if (oot::ui::macos::gameplay_preset(spec.setting, s, l)) {
+                            const bool settings_saved = oot::ui::apply(s);
+                            const bool lighting_saved = oot::ui::lighting::apply(l);
+                            g_macos_preset_applied = spec.setting;
+                            g_macos_preset_status = settings_saved && lighting_saved
+                                ? " Applied and saved." : " Applied for this session; settings could not be saved.";
+                            std::fprintf(stderr, "[preset] macOS %d applied, settings_saved=%d lighting_saved=%d\n",
+                                         spec.setting, settings_saved, lighting_saved);
+                        }
+                        refresh_rows(screen);
+                        break;
+                    }
+#endif
                     case RowKind::LightingReset:
                         oot::ui::lighting::apply(oot::ui::lighting::defaults());
                         refresh_rows(screen);

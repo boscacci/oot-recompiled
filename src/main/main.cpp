@@ -113,6 +113,11 @@ namespace {
 } // namespace
 
 int main(int argc, char** argv) {
+#if defined(OOT_MACOS_TRACING_APP)
+    // Advertise hardware support in the tracing bundle, including Finder launches.
+    // The saved Lighting switch still controls use; an explicit environment override wins.
+    setenv("OOT_METAL_RAYTRACING", "1", 0);
+#endif
 
     // FIRST OF ALL, because every path below depends on the answer: which shape is this program
     // running in. A `.installed` marker beside the executable means the setup file put us in the

@@ -60,6 +60,12 @@ if (OOT_MACOS_BUILD_RUNTIME)
     target_compile_options(lighting_quality_macos_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
     add_test(NAME lighting_quality_preserves_existing_settings COMMAND lighting_quality_macos_test
         "${CMAKE_BINARY_DIR}/test-data/lighting")
+    add_executable(gameplay_presets_macos_test tests/gameplay_presets_macos_test.cpp
+        src/ui/ui_lighting.cpp src/main/keyvalue.cpp)
+    target_include_directories(gameplay_presets_macos_test PRIVATE "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(gameplay_presets_macos_test PRIVATE librecomp ultramodern)
+    target_compile_options(gameplay_presets_macos_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+    add_test(NAME macos_gameplay_presets COMMAND gameplay_presets_macos_test)
     file(GLOB RECOMPILED_FUNCS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.c")
     file(GLOB RECOMPILED_PATCHES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/RecompiledPatches/*.c")
     file(GLOB RSP_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/rsp/*.cpp")
@@ -273,6 +279,9 @@ if (OOT_MACOS_BUILD_APP)
         "${RT64_SRC_DIR}/src/contrib/dxc/inc"
         "${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/N64Recomp/include")
     target_compile_definitions(OoTRecompiled PRIVATE HLSL_CPU=1)
+    if (RT64_RAYTRACING)
+        target_compile_definitions(OoTRecompiled PRIVATE OOT_MACOS_TRACING_APP=1)
+    endif()
     target_link_libraries(OoTRecompiled PRIVATE
         RecompiledFuncs OoTGeneratedPatches OoTGeneratedRSP
         librecomp ultramodern rt64 SDL2::SDL2 oot_macos_places
