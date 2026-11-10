@@ -24,6 +24,16 @@
 - **Controls:** Movement is mapped to WASD; A to Space; B to Left Shift; Z-target to Q; Start to Return; C buttons to IJKL. The settings menu is opened with F1. An 8BitDo Ultimate wireless was recognized over Bluetooth with SDL’s built-in mapping. The menu is bound to Back/Select; bindings can be inspected or changed in Controls. Physical button/stick behavior and rumble have not yet been confirmed.
 - **Saves and packs:** User data is stored in `~/Library/Application Support/OoT Recompiled/`. An RT64 `.rtz` pack can be placed in its `texture-packs/` folder and selected on the Texture pack row. Existing saves should be backed up before an experimental build is used.
 
+## Build your Mac app with a ROM
+
+- Download this branch with GitHub’s **Code → Download ZIP**, unzip it, and double-click **Build macOS App.command**. A native Mac builder window is opened. A Git clone also works.
+- Drop your own **USA 1.0 `.z64` ROM** into the window, or use **Choose ROM**. Click **Check setup**, then **Build app**. The ROM is verified locally before compilation; it is never uploaded.
+- First-time setup: full **Xcode** must be installed and opened once. Its Metal Toolchain is installed through Xcode’s Components settings. The builder links to Xcode and Homebrew, and **Install build tools** installs the remaining Homebrew dependencies after confirmation. Allow at least **30 GiB free** and time for the first build.
+- **Include fancy lighting** produces the tracing app used here. Apple’s separately licensed **Metal Shader Converter 4.0 beta 3** is required; its downloaded package can be selected in the builder after its license has been reviewed. Turn this option off to build the standard Metal app instead.
+- When compilation and native tests pass, **Open app** launches the result; **Show app in Finder** reveals it. On first play, the same ROM can be selected in the game. Texture packs are optional and supplied separately.
+- **Cancel** stops the current build and its compiler processes. Completed work can be reused on retry. ZIP downloads get an isolated Git checkout under `build/source`; its source commit is shown in the log and retained on retries. Existing Git clones are built at their current revision.
+- This is a local source builder, not a portable binary installer: Homebrew SDL2 and FreeType remain required on the build Mac. No ROM, converter, or compiled game is distributed.
+
 ## Visual settings on this M5
 
 - **Simple controls:** Picture quality, textures, and lighting are independent and saved when selected. High gives the sharpest picture; Medium and Low leave more room for smooth play. Enhanced textures use a lighter version of the selected pack; Maximum uses its full detail. Original uses the game's own textures. An installed pack is required for Enhanced/Maximum. Extra lighting can be reduced or switched off separately. Existing window and aspect-ratio preferences are preserved.
