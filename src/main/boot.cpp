@@ -23,6 +23,10 @@
 
 #include <SDL.h>
 #include <SDL_syswm.h>
+#if defined(__APPLE__)
+#include <SDL_metal.h>
+#include "ui/input/pointer_coordinates.h"
+#endif
 
 #include "ultramodern/ultramodern.hpp"
 #include "ultramodern/ultra64.h"
@@ -653,6 +657,16 @@ namespace {
             s_quit_sent = true;
             ultramodern::quit();
         }
+        const auto post_pointer = [](int x, int y) {
+#if defined(__APPLE__)
+            int width = 0, height = 0, pixels_w = 0, pixels_h = 0;
+            SDL_GetWindowSize(g_window, &width, &height);
+            SDL_Metal_GetDrawableSize(g_window, &pixels_w, &pixels_h);
+            x = oot::ui::input::drawable_coordinate(x, width, pixels_w);
+            y = oot::ui::input::drawable_coordinate(y, height, pixels_h);
+#endif
+            oot::ui::shell::post_mouse_move(x, y);
+        };
         SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
             switch (ev.type) {
@@ -685,7 +699,7 @@ namespace {
                     // The mouse reaches the documents (the launcher, a menu over the game) and
                     // the game window's own header, which shows when the pointer is at the top.
                     // The game itself never reads it.
-                    oot::ui::shell::post_mouse_move(ev.motion.x, ev.motion.y);
+                    post_pointer(ev.motion.x, ev.motion.y);
                     oot::ui::input::mouse();
                     break;
 
@@ -694,6 +708,10 @@ namespace {
                     // SDL numbers left, middle, right as 1, 2, 3; RmlUi as 0, 2, 1.
                     const int button = (ev.button.button == SDL_BUTTON_LEFT) ? 0
                                      : (ev.button.button == SDL_BUTTON_RIGHT) ? 1 : 2;
+#if defined(__APPLE__)
+                    // A click can arrive without a motion event (including after a resize).
+                    post_pointer(ev.button.x, ev.button.y);
+#endif
                     oot::ui::shell::post_mouse_button(button, ev.type == SDL_MOUSEBUTTONDOWN);
                     oot::ui::input::mouse();
                     break;

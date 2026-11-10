@@ -16,6 +16,11 @@ target_link_libraries(places_macos_test PRIVATE oot_macos_places)
 target_compile_options(places_macos_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME places_macos COMMAND places_macos_test "${CMAKE_BINARY_DIR}/test-data/places")
 
+add_executable(pointer_coordinates_macos_test tests/pointer_coordinates_macos_test.cpp)
+target_include_directories(pointer_coordinates_macos_test PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_options(pointer_coordinates_macos_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME macos_retina_pointer_targets COMMAND pointer_coordinates_macos_test)
+
 add_executable(texture_packs_macos_test
     tests/texture_packs_macos_test.cpp
     src/game/texture_packs.cpp)

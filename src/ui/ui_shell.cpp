@@ -14,8 +14,9 @@
 #include "ui/ui_render.h"
 #include "ui/ui_settings.h"
 #include "ui/ui_lighting.h"
-#if defined(OOT_MACOS_TRACING_APP)
+#if defined(__APPLE__)
 #include "ui/macos_gameplay_presets.h"
+#include "game/texture_packs.h"
 #endif
 #include "ui/ui_system.h"
 #include "ui/models/rows_model.h"
@@ -759,15 +760,63 @@ namespace {
     // in the settings that opens it, LightingReset the sub menu's last row (2026-09-24).
     // LightingSweep is the sub menu's harness row: every option of every row captured in turn
     // (main/sweep.h, the user's ask of 2026-09-24).
+#if defined(__APPLE__)
+    bool g_macos_advanced = false;
+    int g_macos_last_pack = 0;
+    int g_macos_status_row = -1;
+    std::string g_macos_status;
+
+    int macos_count(int row) {
+        if (row == 1) return oot::packs::list().empty() ? 1 : 3;
+        if (row == 2) {
 #if defined(OOT_MACOS_TRACING_APP)
-    int g_macos_preset_applied = -1;
-    std::string g_macos_preset_status;
+            return oot::rt_state::supported() ? 4 : 1;
+#else
+            return 1;
+#endif
+        }
+        return 3;
+    }
+    int macos_value(int row) {
+        if (macos_count(row) == 1) return 0;
+        if (row == 0) return oot::ui::macos::picture_choice(oot::ui::settings());
+        if (row == 1) return oot::ui::macos::texture_choice(oot::ui::settings());
+        return oot::ui::macos::lighting_choice(oot::ui::lighting::current());
+    }
+    const char* macos_label(int row, int value) {
+        if (value < 0) return "Custom";
+        const char* picture[] = { "Low", "Medium", "High" };
+        const char* textures[] = { "Original", "Enhanced", "Maximum" };
+        const char* lighting[] = { "Off", "Low", "Medium", "High" };
+        return row == 0 ? picture[value] : (row == 1 ? textures[value] : lighting[value]);
+    }
+    void macos_set(int row, int value) {
+        if (row < 0 || row > 2 || value < 0 || value >= macos_count(row)) return;
+        auto settings = oot::ui::settings();
+        auto lighting = oot::ui::lighting::current();
+        bool saved = false;
+        if (row == 0) {
+            oot::ui::macos::picture_quality(value, settings);
+            saved = oot::ui::apply(settings);
+        } else if (row == 1) {
+            if (settings.texture_pack > 0) g_macos_last_pack = settings.texture_pack;
+            if (!oot::ui::macos::texture_quality(value, static_cast<int>(oot::packs::list().size()),
+                                                g_macos_last_pack, settings)) return;
+            saved = oot::ui::apply(settings);
+        } else {
+            oot::ui::macos::lighting_quality(value, lighting);
+            saved = oot::ui::lighting::apply(lighting);
+        }
+        g_macos_status_row = row;
+        g_macos_status = saved ? "" : " Applied for now, but settings could not be saved.";
+        std::fprintf(stderr, "[graphics] control=%d choice=%d saved=%d\n", row, value, saved);
+    }
 #endif
 
     enum class RowKind { Setting, Rom, Controls, Files, Moments, Debug, Play, Quit, Lighting, LightingMenu, LightingReset, LightingSweep, Warps, TimeOfDay, Piece, HudMenu,
                          CapturePhoto, CaptureVideo
-#if defined(OOT_MACOS_TRACING_APP)
-                         , MacPreset
+#if defined(__APPLE__)
+                         , MacSimple, MacAdvanced
 #endif
                          };
 
@@ -1026,9 +1075,13 @@ namespace {
             }
         };
         if (screen == Screen::Graphics) {
-#if defined(OOT_MACOS_TRACING_APP)
-            for (int preset = 0; preset < 3; ++preset) {
-                rows.push_back(RowSpec{ RowKind::MacPreset, preset });
+#if defined(__APPLE__)
+            for (int control = 0; control < 3; ++control)
+                rows.push_back(RowSpec{ RowKind::MacSimple, control });
+            rows.push_back(RowSpec{ RowKind::MacAdvanced, 0 });
+            if (!g_macos_advanced) {
+                rows.push_back(RowSpec{ RowKind::Quit, 0 });
+                return rows;
             }
 #endif
             for (const char* key : { "window", "resolution", "downsampling", "aspect", "antialiasing", "renderdistance",
@@ -1041,6 +1094,10 @@ namespace {
                 add("texturedetail");
             }
             rows.push_back(RowSpec{ RowKind::LightingMenu, 0 });
+#if defined(__APPLE__)
+            rows.push_back(RowSpec{ RowKind::Files, 0 });
+            rows.push_back(RowSpec{ RowKind::Quit, 0 });
+#endif
             return rows;
         }
         if (screen == Screen::Gameplay) {
@@ -1442,29 +1499,37 @@ namespace {
                                  [setting](int i) { return oot::ui::lighting::option_label(setting, i); });
                     break;
                 }
-#if defined(OOT_MACOS_TRACING_APP)
-                case RowKind::MacPreset: {
-                    const char* labels[] = { "Native detail", "Native balanced", "1080p headroom" };
+#if defined(__APPLE__)
+                case RowKind::MacSimple: {
+                    const int control = specs[i].setting;
+                    const char* labels[] = { "Picture quality", "Textures", "Lighting effects" };
                     const char* notes[] = {
-                        "Native resolution, 8x AA, 4 AO rays. Try on a faster GPU or a 1440p display.",
-                        "Native resolution, 2x AA, 2 AO rays. More headroom for larger displays.",
-                        "1080p, 2x AA, 2 AO rays. Use if native resolution cannot hold 20 fps." };
-                    row.label = labels[specs[i].setting];
-                    row.value = "Apply 20 fps / Full textures / level-2 lighting";
-                    row.note = notes[specs[i].setting];
-                    row.note += " Selected pack, original draw distance; level-3 effects off. Settings remain adjustable.";
-                    if (specs[i].setting == 0) {
-                        int width = 0, height = 0;
-                        oot::ui::render::last_size(width, height);
-                        row.note += " Detected: " + oot::ui::render::device_name() + ", " +
-                                    std::to_string(width) + " x " + std::to_string(height) + " output.";
-                    }
-                    if (g_game_started && !oot::rt_state::supported())
-                        row.note += " Tracing is unavailable; this session uses raster rendering.";
-                    if (g_macos_preset_applied == specs[i].setting) row.note += g_macos_preset_status;
-                    row.shape = oot::ui::rows::Action;
+                        "High gives the sharpest picture. Try Medium or Low if play feels slow.",
+                        "Enhanced artwork uses an installed texture pack. Maximum keeps its finest detail.",
+                        "Richer light and shadows. Turn this down for smoother play." };
+                    const int value = macos_value(control), count = macos_count(control);
+                    row.label = labels[control];
+                    row.value = macos_label(control, value);
+                    row.note = notes[control];
+                    if (control == 1 && count == 1)
+                        row.note = "No texture pack installed. Add one through Advanced, then Your files, and restart the app.";
+                    else if (control == 1 && s.texture_pack > 0)
+                        row.note += " Using: " + std::string(oot::packs::label_for(s.texture_pack)) + ".";
+                    if (control == 2 && count == 1)
+                        row.note = "Extra lighting effects are unavailable on this device or app build.";
+                    if (value < 0) row.note += " Choose a preset to replace this group's custom setup.";
+                    if (g_macos_status_row == control) row.note += g_macos_status;
+                    row.shape = oot::ui::rows::Stepper;
+                    row.low = value <= 0; row.high = value >= count - 1;
+                    row.icon = control == 0 ? "monitor" : (control == 1 ? "layers" : "sun");
+                    draw_options(row, count, value, [control](int v) { return macos_label(control, v); });
                     break;
                 }
+                case RowKind::MacAdvanced:
+                    row.label = g_macos_advanced ? "Hide advanced settings" : "Advanced settings";
+                    row.value = g_macos_advanced ? "Show fewer controls" : "Optional fine-tuning";
+                    row.shape = oot::ui::rows::Action;
+                    break;
 #endif
                 case RowKind::LightingMenu:
                     row.label = "Lighting";
@@ -1650,6 +1715,15 @@ namespace {
             return;
         }
         const RowSpec spec = specs[static_cast<size_t>(index)];
+#if defined(__APPLE__)
+        if (spec.kind == RowKind::MacSimple) {
+            macos_set(spec.setting, wanted);
+            g_focus = index;
+            refresh_rows(g_screen);
+            apply_rows_focus(g_screen);
+            return;
+        }
+#endif
         const auto now = [&spec]() {
             return spec.kind == RowKind::Lighting ? oot::ui::lighting::get_row(oot::ui::lighting::current(), spec.setting)
                                                   : oot::ui::get_row(oot::ui::settings(), spec.setting);
@@ -1677,6 +1751,17 @@ namespace {
         if (index < 0 || index >= static_cast<int>(specs.size())) {
             return;
         }
+#if defined(__APPLE__)
+        if (specs[index].kind == RowKind::MacSimple) {
+            const int control = specs[index].setting;
+            const int current = macos_value(control);
+            macos_set(control, current < 0 ? 0 : current + (id.compare(0, 5, "prev-") == 0 ? -1 : 1));
+            g_focus = index;
+            refresh_rows(g_screen);
+            apply_rows_focus(g_screen);
+            return;
+        }
+#endif
         if (specs[index].kind != RowKind::Setting && specs[index].kind != RowKind::Lighting &&
             specs[index].kind != RowKind::TimeOfDay && specs[index].kind != RowKind::Piece) {
             return;
@@ -1916,6 +2001,13 @@ namespace {
                     }
                     apply_rows_focus(screen);
                 }
+#if defined(__APPLE__)
+                else if (spec.kind == RowKind::MacSimple) {
+                    const int current = macos_value(spec.setting);
+                    macos_set(spec.setting, current < 0 ? 0 : current + (nav == Nav::Right ? 1 : -1));
+                    refresh_rows(screen);
+                }
+#endif
                 else if (spec.kind == RowKind::Setting) {
                     nudge_setting(spec.setting, nav == Nav::Right ? 1 : -1);
                     refresh_rows(screen);
@@ -1973,22 +2065,15 @@ namespace {
                     case RowKind::CaptureVideo:
                         show(Screen::Video);
                         break;
-#if defined(OOT_MACOS_TRACING_APP)
-                    case RowKind::MacPreset: {
-                        auto s = oot::ui::settings();
-                        auto l = oot::ui::lighting::current();
-                        if (oot::ui::macos::gameplay_preset(spec.setting, s, l)) {
-                            const bool settings_saved = oot::ui::apply(s);
-                            const bool lighting_saved = oot::ui::lighting::apply(l);
-                            g_macos_preset_applied = spec.setting;
-                            g_macos_preset_status = settings_saved && lighting_saved
-                                ? " Applied and saved." : " Applied for this session; settings could not be saved.";
-                            std::fprintf(stderr, "[preset] macOS %d applied, settings_saved=%d lighting_saved=%d\n",
-                                         spec.setting, settings_saved, lighting_saved);
-                        }
+#if defined(__APPLE__)
+                    case RowKind::MacSimple:
+                        macos_set(spec.setting, (macos_value(spec.setting) + 1) % macos_count(spec.setting));
                         refresh_rows(screen);
                         break;
-                    }
+                    case RowKind::MacAdvanced:
+                        g_macos_advanced = !g_macos_advanced;
+                        refresh_rows(screen);
+                        break;
 #endif
                     case RowKind::LightingReset:
                         oot::ui::lighting::apply(oot::ui::lighting::defaults());
@@ -4988,7 +5073,11 @@ namespace {
             return false;
         }
         const RowSpec& spec = specs[static_cast<size_t>(g_focus)];
-        return spec.kind == RowKind::Lighting || spec.kind == RowKind::TimeOfDay || spec.kind == RowKind::Piece ||
+        return
+#if defined(__APPLE__)
+               spec.kind == RowKind::MacSimple ||
+#endif
+               spec.kind == RowKind::Lighting || spec.kind == RowKind::TimeOfDay || spec.kind == RowKind::Piece ||
                (spec.kind == RowKind::Setting && !is_check_setting(spec.setting));
     }
 
@@ -5448,6 +5537,10 @@ namespace {
             screen = Screen::Launch;
         }
         const Screen previous = g_screen;
+#if defined(__APPLE__)
+        if (screen == Screen::Graphics && previous != Screen::Graphics && previous != Screen::Lighting)
+            g_macos_advanced = false;
+#endif
         if (screen == Screen::Ask && previous != Screen::Ask) {
             g_ask_yes = false;
         }
@@ -5504,8 +5597,12 @@ namespace {
             set_text(g_lighting_doc, "lighting-foot",
                      oot::rt_state::supported()
                          ? "Each part switches on its own; the tools for inspecting a single pass are under Debugging"
+#if defined(__APPLE__)
+                         : "Extra lighting effects are unavailable on this device or app build");
+#else
                          : "This graphics device cannot trace rays, so these rows change nothing and the game "
                            "draws its own lighting and shadows. It needs a card that supports DirectX Raytracing");
+#endif
         }
         set(g_about_doc, page == Screen::About);
         set(g_controls_doc, page == Screen::Controls);
